@@ -97,6 +97,7 @@ class Case(AnchorBase):
         self.name = None
         self.testclass = None
         self.properties = list()
+        self.result = None
 
     def failed(self):
         """
@@ -141,7 +142,8 @@ class Case(AnchorBase):
             <div class="details">
                 <span class="testname"><b>{testname}</b></span><br/>
                 <span class="testclassname">{testclassname}</span><br/>
-                <span class="duration">Time Taken: {duration}s</span>
+                <span class="duration">Time Taken: {duration}s</span><br/>
+                <span class="result">Result: {result}</span>
             </div>
             {skipped}
             {failure}
@@ -158,6 +160,7 @@ class Case(AnchorBase):
                    testname=self.name,
                    testclassname=self.testclass.name,
                    duration=self.duration,
+                   result=self.result,
                    failure=failure,
                    skipped=skipped,
                    properties="".join(properties),
@@ -179,6 +182,7 @@ class Suite(AnchorBase):
         self.errors = []
         self.stdout = None
         self.stderr = None
+        self.result = None
 
     def __contains__(self, item):
         """
@@ -371,6 +375,7 @@ class Suite(AnchorBase):
             <tr><th align="left">Duration</th><td align="right">{duration} sec</td></tr>
             <tr><th align="left">Test Cases</th><td align="right">{count}</td></tr>
             <tr><th align="left">Failures</th><td align="right">{fails}</td></tr>
+            <tr><th align="left">RESULT!</th><td align="right">{result}</td></tr>
             {errs}
             {stdio}
             </table>
@@ -393,7 +398,9 @@ class Suite(AnchorBase):
                    properties=props,
                    classes="".join(classes),
                    count=len(self.all()),
-                   fails=len(self.failed()))
+                   fails=len(self.failed()),
+                   result=self.result)
+
 
 
 class Junit(object):
@@ -501,6 +508,7 @@ class Junit(object):
                     newcase.name = testcase.attrib["name"]
                     newcase.testclass = testclass
                     newcase.duration = float(testcase.attrib.get("time", '0').replace(',',''))
+                    newcase.result = testcase.attrib["result"]
                     testclass.cases.append(newcase)
 
                     # does this test case have any children?
