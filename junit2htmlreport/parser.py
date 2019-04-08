@@ -93,11 +93,16 @@ class Case(AnchorBase):
         self.skipped_msg = None
         self.stderr = None
         self.stdout = None
+        self.reqs = None
         self.duration = 0
         self.name = None
         self.testclass = None
+        self.type = None
         self.properties = list()
-        self.result = None
+        self.status = None
+        self.expected = None
+        self.actual = None
+        self.comments = None
 
     def failed(self):
         """
@@ -141,31 +146,39 @@ class Case(AnchorBase):
         <div class="testcase">
             <div class="details">
                 <span class="testname"><b>{testname}</b></span><br/>
-                <span class="testclassname">{testclassname}</span><br/>
+                <span class="testclassname"><b>{type} {testclassname}</b></span><br/>
+                <span class="requirements">Time Taken: {reqs}</span><br/>
                 <span class="duration">Time Taken: {duration}s</span><br/>
-                <span class="result">Result: {result}</span>
             </div>
             {skipped}
             {failure}
             <hr size="1"/>
             {properties}
-            <div class="stdout"><i>Stdout</i><br/>
-                <pre>{stdout}</pre></div>
-            <hr size="1"/>
-            <div class="stderr"><i>Stderr</i><br/>
-                <pre>{stderr}</pre></div>
+            <div class="status"><i>Status</i><br/>
+                <pre>{status}</pre></div>
+            <div class="expected"><i>Expected</i><br/>
+                <pre>{expected}</pre></div>
+            <div class="actual"><i>Actual</i><br/>
+                <pre>{actual}</pre></div>
+            <div class="comments"><i>Comments</i><br/>
+                <pre>{comments}</pre></div>
         </div>
     </a>
         """.format(anchor=self.anchor(),
                    testname=self.name,
                    testclassname=self.testclass.name,
+                   reqs=self.reqs,
+                   type=self.type,
                    duration=self.duration,
-                   result=self.result,
                    failure=failure,
                    skipped=skipped,
                    properties="".join(properties),
                    stdout=stdout,
-                   stderr=stderr)
+                   stderr=stderr,
+                   status=self.status,
+                   expected=self.expected,
+                   actual=self.actual,
+                   comments=self.comments)
 
 
 class Suite(AnchorBase):
@@ -183,6 +196,11 @@ class Suite(AnchorBase):
         self.stdout = None
         self.stderr = None
         self.result = None
+        self.total = 0
+        self.successes = 0
+        self.failures =0
+        self.skips = 0
+        self.manuals = 0
 
     def __contains__(self, item):
         """
@@ -373,9 +391,11 @@ class Suite(AnchorBase):
             {properties}
             <table>
             <tr><th align="left">Duration</th><td align="right">{duration} sec</td></tr>
-            <tr><th align="left">Test Cases</th><td align="right">{count}</td></tr>
-            <tr><th align="left">Failures</th><td align="right">{fails}</td></tr>
-            <tr><th align="left">RESULT!</th><td align="right">{result}</td></tr>
+            <tr><th align="left">Total tests</th><td align="right">{total}</td></tr>
+            <tr><th align="left">Success</th><td align="right">{successes}</td></tr>
+            <tr><th align="left">Failures</th><td align="right">{failures}</td></tr>
+            <tr><th align="left">Skipped</th><td align="right">{skips}</td></tr>
+            <tr><th align="left">manual</th><td align="right">{manuals}</td></tr>
             {errs}
             {stdio}
             </table>
@@ -399,7 +419,12 @@ class Suite(AnchorBase):
                    classes="".join(classes),
                    count=len(self.all()),
                    fails=len(self.failed()),
-                   result=self.result)
+                   result=self.result,
+                   total=self.total,
+                   successes=self.successes,
+                   failures=self.failures,
+                   skips=self.skips,
+                   manuals=self.manuals)
 
 
 
@@ -472,6 +497,11 @@ class Junit(object):
             if "package" in suite.attrib:
                 cursuite.package = suite.attrib["package"]
             cursuite.duration = float(suite.attrib.get("time", '0').replace(',',''))
+            cursuite.total = suite.attrib["tests"]
+            cursuite.successes = suite.attrib["success"]
+            cursuite.failures = suite.attrib["failures"]
+            cursuite.skips = suite.attrib["skipped"]
+            cursuite.manuals = suite.attrib["manual"]
 
             for element in suite:
                 if element.tag == "error":
@@ -492,7 +522,7 @@ class Junit(object):
                         if prop.tag == "property":
                             cursuite.properties[prop.attrib["name"]] = prop.attrib["value"]
 
-                if element.tag == "testcase":
+                if element.tag == "testcase" or "manual_testcase":
                     testcase = element
 
                     if not testcase.attrib.get("classname", None):
@@ -503,12 +533,19 @@ class Junit(object):
                         testclass.name = testcase.attrib["classname"]
                         cursuite[testclass.name] = testclass
 
+                    type = None
+                    if testcase.tag == "manual_testcase":
+                        type = "Manual" 
+                    else:
+                        type = "Auto"
+
                     testclass = cursuite[testcase.attrib["classname"]]
                     newcase = Case()
                     newcase.name = testcase.attrib["name"]
                     newcase.testclass = testclass
+                    newcase.type = type
+                    newcase.reqs = testcase.attrib["reqs"]
                     newcase.duration = float(testcase.attrib.get("time", '0').replace(',',''))
-                    newcase.result = testcase.attrib["result"]
                     testclass.cases.append(newcase)
 
                     # does this test case have any children?
@@ -535,6 +572,11 @@ class Junit(object):
                                 newproperty.name = property.attrib["name"]
                                 newproperty.value = property.attrib["value"]
                                 newcase.properties.append(newproperty)
+                        elif child.tag == "result":
+                            newcase.status = child.attrib["status"]
+                            newcase.expected = child.attrib["expected"]
+                            newcase.actual = child.attrib["actual"]
+                            newcase.comments = child.attrib["comments"]
 
     def get_html_head(self):
         """
